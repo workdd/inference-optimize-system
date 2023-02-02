@@ -11,6 +11,37 @@ import scipy.stats as st
 from probabilities import *
 from collections import Counter
 
+twitter_datas = pd.read_csv("twitter.csv")
+twitter_datas.columns = ['Time', 'QPS']
+perform_datas = pd.read_csv("perform.csv")
+pd.options.display.float_format = '{:.10f}'.format
+
+
+lambda_data_2048 = {
+    'mobilenet_v2': 43.6,
+    'inception_v3': 275.5,
+    'resnet50' : 193,
+    'vgg16': 466,
+    'vgg19': 554,
+}
+lambda_price_2048 = 0.0000000333
+
+display(perform_datas)
+print(perform_datas)
+
+inferentia_price = 0.0060333333 / 60
+print(inferentia_price)
+
+datas = twitter_datas
+display(datas)
+
+x = list(datas.get('Time').values)
+y = list(datas.get('QPS').values)
+
+print(datas['QPS'][:600].sum())
+
+totals = datas['QPS'][:600].sum()
+
 TARGET_LATENCY = 200 #ms
 T = [1,5,10,30,60,180]
 
