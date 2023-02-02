@@ -14,7 +14,7 @@ from collections import Counter
 twitter_datas = pd.read_csv("twitter.csv")
 twitter_datas.columns = ['Time', 'QPS']
 perform_datas = pd.read_csv("perform.csv")
-pd.options.display.float_format = '{:.10f}'.format
+# pd.options.display.float_format = '{:.10f}'.format
 
 
 lambda_data_2048 = {
@@ -26,14 +26,12 @@ lambda_data_2048 = {
 }
 lambda_price_2048 = 0.0000000333
 
-display(perform_datas)
 print(perform_datas)
 
 inferentia_price = 0.0060333333 / 60
 print(inferentia_price)
 
 datas = twitter_datas
-display(datas)
 
 x = list(datas.get('Time').values)
 y = list(datas.get('QPS').values)
