@@ -47,7 +47,7 @@ for t in T:
     default[t] = 0
 
 inferentia_price = 0.000100555555
-model = "resnet50"
+model = "vgg19"
 
 model_index = {
     "mobilenet_v2": 0,
@@ -203,12 +203,11 @@ def OptimizeSystem(LambdaJobs, InferentiaInstances, events):
 
 
 def Oracle(LambdaJobs, InferentiaInstances, events):
-    CurrentLambdaJobs = 0
     event = events[0]
     NeedInstances = event // PerformInferentia[1]
     remainEvents = event % PerformInferentia[1]
 
-    if PerformLambda[1] < event:
+    if PerformLambda[1] < remainEvents:
         NeedInstances += 1
     else:
         LambdaJobs += remainEvents
@@ -251,10 +250,11 @@ print(onlylambda_jobs,
       optimizesystem_jobs,
       oracle_jobs)
 
+print('Model:', model)
 print('Only Lambda:', onlylambda_jobs * lambda_per_price)
 print('Max Instances:', max_instances * (end_time + 1) * inferentia_price)
 print('Scaling Instances:', scaling_usedinstances * inferentia_price)
 print('Optimize System:', optimizesystem_jobs[0] * lambda_per_price +
       optimizesystem_jobs[1] * inferentia_price)
-print('Oracle:', oracle_jobs[0] * lambda_per_second +
+print('Oracle:', oracle_jobs[0] * lambda_per_price +
       oracle_jobs[1] * inferentia_price)
