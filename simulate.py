@@ -91,7 +91,8 @@ def RequestMonitor(start_time):
     requests = copy.deepcopy(default)
     for t in T:
         # 현재 시간 부터 앞으로의 t 만큼 체크, 이벤트의 총합 계산
-        requests[t] = twitter_datas[start_time:start_time + t]['QPS'].values.sum(axis=0) * EVENT_TESTING
+        requests[t] = twitter_datas[
+            start_time:start_time + t]['QPS'].values.sum(axis=0) * EVENT_TESTING
     return requests
 
 
@@ -110,19 +111,20 @@ def OnlyLambda(currentJobs, events):
     return currentJobs
 
 
-def MaxInstance(currentJobs, events, instances, UsedInstances):
-    while events[0] > inferentia_per_second * instances:
-        instances += 1
+def MaxInstance(currentJobs, events, NeedInstances, UsedInstances):
+    while events[0] > inferentia_per_second * NeedInstances:
+        NeedInstances += 1
 
     currentJobs += events[0]
-    UsedInstances += instances
-    return currentJobs, instances, UsedInstances
+    UsedInstances += NeedInstances
+    return currentJobs, NeedInstances, UsedInstances
 
 
-def ScalingInstances(currentJobs, events):
+def ScalingInstances(currentJobs, events, NeedInstances):
     instances = 0
     while True:
-        RemainEvents = events - np.array(list(PerformInferentia.values())) * (NeedInstances + 1)
+        RemainEvents = events - \
+            np.array(list(PerformInferentia.values())) * (NeedInstances + 1)
         EventRatio = len(RemainEvents[RemainEvents < 0]) / len(RemainEvents)
         if EventRatio > 0.5:
             break
@@ -132,38 +134,13 @@ def ScalingInstances(currentJobs, events):
     currentJobs += events[0]
     return currentJobs
 
-onlylambda_jobs = 0
-maxinstances_jobs = 0
-scalinginstances_jobs = 0
-optimizesystem_jobs = 0
-oracle_jobs = 0
 
-while (start_time <= end_time):
-    #     print("Current Time:", start_time)
-
-    Events = RequestMonitor(start_time)
-    #     print(Events)
-
-    ComparedEventValues = TotalEventValues = np.array(list(Events.values()))
-
-    CurrentLambdaJobs = 0
-    CurrentInferentiaJobs = 0
-
-    ### SETTINGS
-    # Set RHO to a little bit smaller then 1; makes the simulation interesting
-    # RHO = 서버 활용도
-    # MU > LAMBDA, if  mu = 1 and c is 1 otherwise no queue.
-    # 1/MU > 1/LAMBDA if c=2 or higher?
-    # If mu = 2, avg is every 0.5 time step is the time costs of a service.
-    # suppose lambda < 1
-
-    OnlyLambda(onlylambda_jobs,TotalEventValues)
-    MaxInstances(maxinstances_jobs, TotalEventValues)
-    ScalingInstances(scalinginstances_jobs, TotalEventValues)
-
+def System(currentJobs, events):
+    TotalEventValues = events
     NeedInstances = 0
     while True:
-        RemainEvents = TotalEventValues - np.array(list(PerformInferentia.values())) * (NeedInstances + 1)
+        RemainEvents = TotalEventValues - \
+            np.array(list(PerformInferentia.values())) * (NeedInstances + 1)
         EventRatio = len(RemainEvents[RemainEvents < 0]) / len(RemainEvents)
         if EventRatio > 0.5:
             break
@@ -175,10 +152,12 @@ while (start_time <= end_time):
     if InferentiaInstances == 0:
         RemainEvents = TotalEventValues
     else:
-        RemainEvents = TotalEventValues % (InferentiaInstances * np.array(list(PerformInferentia.values())))
+        RemainEvents = TotalEventValues % (
+            InferentiaInstances * np.array(list(PerformInferentia.values())))
 
     PreferedLambda = np.array(list(PerformLambda.values())) > RemainEvents
-    LambdaRatio = len(PreferedLambda[PreferedLambda == True]) / len(PreferedLambda)
+    LambdaRatio = len(
+        PreferedLambda[PreferedLambda == True]) / len(PreferedLambda)
     #     print("LambdaRatio:", LambdaRatio)
 
     LambdaUsed = False
@@ -187,24 +166,17 @@ while (start_time <= end_time):
     else:
         LambdaUsed = True
 
-    CurrentInferentiaJobs = Events[1]
+    CurrentInferentiaJobs = events[0]
     InferentiaInstances = NeedInstances
 
     if InferentiaInstances > 0:
-        #         print('Servers:', InferentiaInstances)
-        # SIM_TIME: simulation time in time units
         time_idx = 0
         for TimeKey, SIM_TIME in PerformInferentia.items():
-            #             print(SIM_TIME)
-            #             print(TimeKey)
-            #             print(1/MU)
             SERVERS = InferentiaInstances
             MU = SIM_TIME / TimeKey  # 1/mu is exponential service times
             LAMBDA = TotalEventValues[time_idx] / TimeKey
             RHO = LAMBDA / (MU * SERVERS)
 
-            #             print("RHO:",RHO)
-            #             print(expw(MU, SERVERS, RHO) / 2)
             W = expw(MU, SERVERS, RHO) / 2 + 1 / MU
             #             print("SIM_TIME:",SIM_TIME)
             #             print("EXPECTED VALUES AND PROBABILITIES")
@@ -226,31 +198,56 @@ while (start_time <= end_time):
     if LambdaUsed:
         CurrentLambdaJobs += RemainEvents[0]
         LambdaWorkers += CurrentLambdaJobs
-    #     print(Events)
-    #     print(RemainEvents[0])
-    #     print(InferentiaInstances)
-    #     print(CurrentInferentiaJobs)
+
     CurrentInferentiaJobs = Events[1] - CurrentLambdaJobs
     InferentiaJobs += CurrentInferentiaJobs
 
     WorkedByLambda.append(CurrentLambdaJobs)
     WorkedByInferentia.append(CurrentInferentiaJobs)
     InstanceOnTimes += 1 * InferentiaInstances
-    #     print("Lambda_Workers:",LambdaWorkers)
-    #     print("InferentiaInstances:",InferentiaInstances, "Worked by Inferentia Job:", InferentiaJobs)
 
     if MaxInstances < InferentiaInstances:
         MaxInstances = InferentiaInstances
+
+
+def Oracle(currentJobs, events):
+    return True
+
+
+onlylambda_jobs = 0
+maxinstances_jobs = 0
+scalinginstances_jobs = 0
+optimizesystem_jobs = [0, 0]
+oracle_jobs = [0, 0]
+
+start_time = 0
+
+while (start_time <= end_time):
+    #     print("Current Time:", start_time)
+
+    Events = RequestMonitor(start_time)
+
+    ComparedEventValues = TotalEventValues = np.array(list(Events.values()))
+
+    CurrentLambdaJobs = 0
+    CurrentInferentiaJobs = 0
+
+    OnlyLambda(onlylambda_jobs, TotalEventValues)
+    MaxInstances(maxinstances_jobs, TotalEventValues)
+    ScalingInstances(scalinginstances_jobs, TotalEventValues)
+
     start_time += 1
 # if real simulation
 # time.sleep(1)
 print("Model Name:", model)
 print("Lambda_Workers:", LambdaWorkers)
-print("InferentiaInstances:", InferentiaInstances, "Worked by Inferentia Job:", InferentiaJobs)
+print("InferentiaInstances:", InferentiaInstances,
+      "Worked by Inferentia Job:", InferentiaJobs)
 print("InstanceOnTimes:", InstanceOnTimes)
 print("Instance Prices:", InstanceOnTimes * inferentia_price)
 print("Lambda Prices:", lambda_per_price * LambdaWorkers)
-print("Total Prices:", lambda_per_price * LambdaWorkers + InstanceOnTimes * inferentia_price)
+print("Total Prices:", lambda_per_price *
+      LambdaWorkers + InstanceOnTimes * inferentia_price)
 
 print("Only Lambda Prices", lambda_per_price * totals * 10)
 print("Only Inferentia Prices", 600 * inferentia_price * MaxInstances)
