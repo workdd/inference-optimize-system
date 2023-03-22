@@ -12,8 +12,8 @@ import scipy.stats as st
 from probabilities import *
 from collections import Counter
 
-chunksize = 1000
-days = list(range(1, 23))
+chunksize = 50000
+days = list(range(1, 2))
 
 lambda_data_2048 = {
         'mobilenet_v2': 43.6,
@@ -31,12 +31,9 @@ for model in models:
         twitter_datas = pd.read_csv(f"datetime-csv/202211{day:02d}.csv", chunksize = chunksize)
         twitter_datas = list(twitter_datas)
         twitter_datas = twitter_datas[0]
-        twitter_datas.columns = ['Time', 'QPS']
+        twitter_datas.columns = ['','Time', 'QPS']
         perform_datas = pd.read_csv("perform.csv")
         # pd.options.display.float_format = '{:.10f}'.format
-
-
-        
         lambda_price_2048 = 0.0000000333
 
 
@@ -255,13 +252,15 @@ for model in models:
 
             start_time += 1
 
+        
+
+        print(f'-------------------------------------{day:2d}-------------------------------------')
         print(onlylambda_jobs,
             max_instances,
             scaling_usedinstances,
             optimizesystem_jobs,
             oracle_jobs)
-
-        print(f'-------------------------------------{day:2d}-------------------------------------')
+            
         data = {
             'Model': model,
             'Only Lambda': onlylambda_jobs * lambda_per_price,
